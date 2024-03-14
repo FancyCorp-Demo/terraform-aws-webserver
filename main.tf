@@ -12,6 +12,11 @@ terraform {
       source  = "hashicorp/hcp"
       version = "~> 0.82"
     }
+
+    terracurl = {
+      source  = "devops-rob/terracurl"
+      version = "~> 1.0"
+    }
   }
 }
 
@@ -128,3 +133,45 @@ check "ami_age" {
     error_message = "The image referenced in the Packer bucket is more than 30 days old."
   }
 }
+
+locals {
+  webserver_url = "http://${aws_instance.web.public_ip}"
+}
+
+resource "terracurl_request" "test" {
+  name   = "smoke test webserver"
+  url    = local.webserver_url
+  method = "GET"
+
+  response_codes = [
+    200
+  ]
+
+  // Retry for up to 60s
+  max_retry      = 4
+  retry_interval = 15
+
+  lifecycle {
+    // Any change to the EC2 instance, do another TerraCurl check
+    replace_triggered_by = [
+      aws_instance.web
+    ]
+  }
+
+  /*
+    If this resource is created successfully, we get something like this in the Apply output:
+  
+    module.webserver.terracurl_request.test: Creating...
+    module.webserver.terracurl_request.test: Still creating... [10s elapsed]
+    module.webserver.terracurl_request.test: Creation complete after 16s [id=smoke test 
+    webserver]
+
+    If not...
+    Currently it hangs forever, if I remove access by (e.g.) removing the port 80 SG
+    Blocked by https://github.com/devops-rob/terraform-provider-terracurl/issues/45
+
+    But with a fake URL instead, it gets:
+    │ Error: unable to make request: request failed, retries exceeded: 404 response received:
+  */
+}
+

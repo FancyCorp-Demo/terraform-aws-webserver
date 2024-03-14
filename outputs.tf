@@ -4,5 +4,9 @@ output "ec2_connect_url" {
 }
 
 output "web_server_url" {
-  value = "http://${aws_instance.web.public_ip}"
+  value = local.webserver_url
+}
+
+output "response" {
+  value = terracurl_request.test.response
 }
